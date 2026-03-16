@@ -29,12 +29,17 @@
         attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
 
-      const planeIcon = L.divIcon({
-        className: '',
-        html: '<span style="font-size:28px;color:#FFD700;text-shadow:0 0 4px #000;">✈</span>',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
+      function makePlaneIcon(flight) {
+        const label = flight
+          ? `<span style="font-size:11px;color:#FFD700;background:rgba(0,0,0,0.6);padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle;font-family:monospace;">${flight}</span>`
+          : '';
+        return L.divIcon({
+          className: '',
+          html: `<div style="display:flex;align-items:center;white-space:nowrap;"><span style="font-size:28px;color:#FFD700;text-shadow:0 0 4px #000;">✈</span>${label}</div>`,
+          iconSize: null,
+          iconAnchor: [16, 16]
+        });
+      }
 
       const markers = {};
       const status = document.getElementById('status');
@@ -45,7 +50,8 @@
         aircraft.forEach(ac => {
           const id = ac.hex;
           seen.add(id);
-          const label = ac.flight?.trim() || id;
+          const flight = ac.flight?.trim() || null;
+          const label = flight || id;
           const popup = `
             <b>${label}</b><br>
             Alt: ${ac.altitude?.toLocaleString() ?? '?'} ft<br>
@@ -57,10 +63,10 @@
 
           if (markers[id]) {
             markers[id].setLatLng([ac.lat, ac.lon]);
+            markers[id].setIcon(makePlaneIcon(flight));
             markers[id].getPopup()?.setContent(popup);
-            // Rotate icon by heading if you add CSS rotation
           } else {
-            markers[id] = L.marker([ac.lat, ac.lon], { icon: planeIcon })
+            markers[id] = L.marker([ac.lat, ac.lon], { icon: makePlaneIcon(flight) })
               .bindPopup(popup)
               .addTo(map);
           }
