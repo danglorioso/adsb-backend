@@ -9,15 +9,21 @@
       #map { width: 100vw; height: 100vh; }
       #status { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.7);
                 padding: 8px 12px; border-radius: 4px; z-index: 999; font-size: 13px; }
+      #copyright { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+                   background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 4px;
+                   z-index: 999; font-size: 12px; white-space: nowrap; }
+      #copyright a { color: #FFD700; text-decoration: none; }
+      #copyright a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
     <div id="map"></div>
     <div id="status">Connecting...</div>
+    <div id="copyright">ADS-B data by <a href="https://danglorioso.com" target="_blank">Dan Glorioso</a> &copy; 2025</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      const map = L.map('map').setView([42.8, -71.3], 8); // center of map
+      const map = L.map('map').setView([42.2, -70.9], 9); // centered on eastern MA
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO'
@@ -25,9 +31,9 @@
 
       const planeIcon = L.divIcon({
         className: '',
-        html: '✈',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        html: '<span style="font-size:28px;color:#FFD700;text-shadow:0 0 4px #000;">✈</span>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
 
       const markers = {};
@@ -89,6 +95,9 @@
       }
 
       connect();
+
+      // Auto-refresh page every 60 seconds to keep data fresh
+      setTimeout(() => location.reload(), 60000);
     </script>
   </body>
   </html>
