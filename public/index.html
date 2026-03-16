@@ -17,7 +17,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      const map = L.map('map').setView([40.0, -98.0], 5); // center on your region
+      const map = L.map('map').setView([42.8, -71.3], 8); // center of map
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO'
@@ -72,8 +72,8 @@
       }
 
       function connect() {
-        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const ws = new WebSocket(`${proto}://${location.host}`);
+        // const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`wss://adsb-backend-production.up.railway.app`);
 
         ws.onmessage = e => {
           const { aircraft } = JSON.parse(e.data);
