@@ -1,0 +1,162 @@
+# ADS-B Flight Tracker                                                                               
+                                                                                          
+  I have a Raspberry Pi running as a FlightRadar24 feeder — it has an SDR antenna attached that        
+  receives ADS-B signals from aircraft flying overhead and uploads them to FlightRadar24. I wanted to  
+  also use that data myself, so I built this: a real-time flight tracker that pulls the decoded        
+  aircraft data off the Pi and displays it on a live map hosted online.                                
+                  
+  ## How it works
+
+  The Pi runs `dump1090-mutability` which decodes the raw ADS-B radio signals and writes the aircraft
+  data (position, altitude, speed, heading, squawk, etc.) to a JSON file at
+  `/run/dump1090-mutability/aircraft.json` every few seconds. A bash script on the Pi reads that file
+  and POSTs it to a Node.js backend hosted on Railway. The backend broadcasts the data to any connected
+   browsers via WebSocket, and the frontend plots the planes on a Leaflet.js map in real time.
+
+  ## Stack
+
+  - **Pi side:** bash script + systemd service
+  - **Backend:** Node.js, Express, ws — hosted on Railway
+  - **Frontend:** Leaflet.js, plain HTML/JS — served by the backend
+
+  ---
+
+  ## Setting this up yourself
+
+  ### Prerequisites
+
+  - Raspberry Pi running FlightRadar24 OS (or any OS running `dump1090` or `dump1090-mutability`)
+  - `dump1090-mutability` must be running with the `--write-json` flag pointing to a directory
+  - A Railway account for hosting the backend
+
+  ### 1. Verify dump1090 is writing data
+
+  SSH into your Pi and check:
+
+  ```bash
+  ls /run/dump1090-mutability/
+  cat /run/dump1090-mutability/aircraft.json
+
+  You should see a JSON file with an aircraft array. If the array is empty, no planes are currently in
+  range — that's fine, the file should still exist.
+
+  If the directory doesn't exist, check that dump1090-mutability is running:
+
+  ps aux | grep dump1090
+
+  2. Set up the Pi forwarder
+
+  Create the script:
+
+  sudo mkdir -p /opt/adsb-forwarder
+  sudo nano /opt/adsb-forwarder/forwarder.sh
+
+  Paste this in:
+
+  #!/bin/bash
+  AIRCRAFT_FILE="/run/dump1090-mutability/aircraft.json"
+  CLOUD_ENDPOINT="https://your-backend.railway.app/api/aircraft"
+  API_KEY="your-secret-key"
+
+  while true; do
+      if [ -f "$AIRCRAFT_FILE" ]; then
+          payload=$(cat "$AIRCRAFT_FILE")
+          if [ -n "$payload" ]; then
+              curl --http1.1 -s -X POST "$CLOUD_ENDPOINT" \
+                  -H "Content-Type: application/json" \
+                  -H "X-API-Key: $API_KEY" \
+                  --data-raw "$payload" \
+                  > /dev/null
+          fi
+      fi
+      sleep 3
+  done
+
+  Make it executable:
+
+  sudo chmod +x /opt/adsb-forwarder/forwarder.sh
+
+  Register it as a systemd service so it runs on boot:
+
+  sudo nano /etc/systemd/system/adsb-forwarder.service
+
+  [Unit]
+  Description=ADS-B Data Forwarder
+  After=network.target
+
+  [Service]
+  ExecStart=/bin/bash /opt/adsb-forwarder/forwarder.sh
+  Restart=always
+  User=pi
+
+  [Install]
+  WantedBy=multi-user.target
+
+  Enable and start it:
+
+  sudo systemctl enable adsb-forwarder
+  sudo systemctl start adsb-forwarder
+  sudo systemctl status adsb-forwarder
+
+  3. Deploy the backend to Railway
+
+  Install dependencies and deploy:
+
+  cd adsb-backend
+  npm install
+
+  Push the project to a GitHub repo, then in Railway:
+
+  1. Create a new project → Deploy from GitHub repo
+  2. Connect your repo
+  3. Go to the service → Variables tab and add:
+  API_KEY = your-secret-key
+  4. Railway will auto-detect Node.js and deploy. Copy your Railway URL.
+
+  4. Update the forwarder and frontend with your Railway URL
+
+  Edit the forwarder script on the Pi:
+
+  sudo nano /opt/adsb-forwarder/forwarder.sh
+
+  Update CLOUD_ENDPOINT and API_KEY to match your Railway URL and the key you set.
+
+  Restart the service:
+
+  sudo systemctl restart adsb-forwarder
+
+  In public/index.html, update the WebSocket URL and map center:
+
+  const ws = new WebSocket(`wss://your-backend.railway.app`);
+  // ...
+  const map = L.map('map').setView([YOUR_LAT, YOUR_LON], 8);
+
+  5. Test the pipeline
+
+  From the Pi, send a test aircraft to verify everything is connected:
+
+  curl --http1.1 -X POST https://your-backend.railway.app/api/aircraft -H "Content-Type:
+  application/json" -H "X-API-Key: your-secret-key" -d '{"aircraft":[{"hex":"test01","lat":42.787,"lon"
+  :-71.332,"altitude":20000,"speed":350,"track":280,"squawk":"1200"}]}'
+
+  You should get {"ok":true,"count":1} back and see a plane appear on the map.
+
+  ---
+  Where the API key lives
+
+  The API key is the only secret in this project. It just prevents random people from POSTing junk data
+   to your endpoint. It needs to match in two places:
+
+  - Railway → Variables tab → API_KEY
+  - Pi → /opt/adsb-forwarder/forwarder.sh → API_KEY=
+
+  ---
+  Notes
+
+  - aircraft.json is updated by dump1090 roughly every second; the forwarder POSTs every 3 seconds
+  - Aircraft without a known position (no lat/lon yet) are included in the raw file but won't appear on
+   the map since Leaflet needs coordinates
+  - The history_*.json files in /run/dump1090-mutability/ are a rolling 120-entry position history
+  buffer maintained by dump1090 — not used by this project but useful if you want to draw flight trails
+  - dump978-fr24 also runs on FR24 OS — that handles UAT (978 MHz) used by smaller GA aircraft in the
+  US. This project only uses the 1090 MHz ADS-B data from dump1090
