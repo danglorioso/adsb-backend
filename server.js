@@ -29,4 +29,11 @@ wss.on('connection', ws => {
     ws.send(JSON.stringify({ aircraft: latestAircraft, ts: Date.now() }));
 });
 
+// Keep WebSocket connections alive through Railway's proxy
+setInterval(() => {
+    wss.clients.forEach(client => {
+        if (client.readyState === 1) client.ping();
+    });
+}, 25000);
+
 server.listen(process.env.PORT || 3000, () => console.log('Listening'));
