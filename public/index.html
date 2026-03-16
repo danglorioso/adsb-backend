@@ -19,7 +19,7 @@
   <body>
     <div id="map"></div>
     <div id="status">Connecting...</div>
-    <div id="copyright">ADS-B data by <a href="https://danglorioso.com" target="_blank">Dan Glorioso</a> &copy; 2026</div>
+    <div id="copyright">ADS-B data by <a href="https://danglorioso.com" target="_blank">Dan Glorioso</a> &copy; <span id="year"></span></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -95,6 +95,8 @@
       }
 
       connect();
+
+      document.getElementById('year').textContent = new Date().getFullYear();
 
     </script>
   </body>
